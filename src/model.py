@@ -88,11 +88,10 @@ class CutPoint():
 
 #GraphicalLasso
 class Segment():
-    def __init__(self,x,gl_mode=None,index=None,id=None,Cov=None,sparsity=0.1,max_iter=100):
+    def __init__(self,x,index=None,id=None,Cov=None,sparsity=0.1,max_iter=100):
         '''
         input
         x: input tensor [time, d1, d2, ..., dn]
-        gl_mode: [0, 0, 1, ..., 0] if 1 use different gl inference
         index: index of data [1,2,3, ...]
         Cov: list of covariance matrix and presicion matrix [([d1, d1], [d1, d1]), ..., ([dn, dn], [dn, dn])]
         '''
@@ -105,8 +104,8 @@ class Segment():
         if isinstance(Cov,list):
             self.Cov = Cov
         else:
-            self.Cov = multimode_GL(x,gl_mode,sparsity=self.sparsity,max_iter=self.max_iter)
-        self.costT,self.costM,self.costC,self.costA = segment_MDL(x,gl_mode,self.index_list,self.Cov,self.sparsity)
+            self.Cov = multimode_GL(x,sparsity=self.sparsity,max_iter=self.max_iter)
+        self.costT,self.costM,self.costC,self.costA = segment_MDL(x,self.index_list,self.Cov,self.sparsity)
 
 def consecutive_index(index):
     '''find groups of consecutive indices in a given list index
@@ -128,14 +127,14 @@ def consecutive_index(index):
     result.append(tmp)
     return result
 
-def Segments_GL(X,cp,gl_mode,sparsity,max_iter):
+def Segments_GL(X,cp,sparsity,max_iter):
     Segments=[]
     for i in range(len(cp)+1):
         X_seg,ind=util.get_seq_at_index(X,cp,index=i,return_index=True)
-        Segments.append(Segment(X_seg,gl_mode,index=ind,id=i,sparsity=sparsity,max_iter=max_iter))
+        Segments.append(Segment(X_seg,index=ind,id=i,sparsity=sparsity,max_iter=max_iter))
     return Segments
 
-def multimode_GL(X, gl_mode, sparsity=0.1, max_iter=100):
+def multimode_GL(X, sparsity=0.1, max_iter=100):
     '''
     input
     X: input tensor [time, d1, d2, ..., dn]
@@ -152,7 +151,7 @@ def multimode_GL(X, gl_mode, sparsity=0.1, max_iter=100):
 
     Cov = []
     for n in range(ndim):
-        X_unfold = sf_unfold(X, gl_mode, mode=n)
+        X_unfold = sf_unfold(X, mode=n)
         TVGL=TimeGraphicalLasso(alpha=sparsity,beta=0,max_iter=max_iter,psi='laplacian',assume_centered=False)
         TVGL.fit(X_unfold,np.zeros(X_unfold.shape[0]))
         cov=(TVGL.precision_[0],TVGL.covariance_[0]) # [dn, dn]
@@ -210,55 +209,21 @@ def sf_unfold(tensor, gl_mode=None, mode=0):
     return np.squeeze(X)
 
 #MDL
-def segments_MDL_dam(Segments,X,gl_mode):
-    # Segments[solo,solo,solo]
-    # return costT of each segment
-    costT=0
-    costA,costC,costM,costL=0,0,0,0
-    n_cluster=len(Segments)
-    n_segment=0
-    for seg in Segments:
-        T,M,C,A,L=segment_MDL_dam(X[seg.index],gl_mode,seg.index_list,seg.Cov,seg.sparsity)
-        n_segment+=len(seg.index_list)
-        costT+=T
-        costM+=M
-        costA+=A
-        costC+=C
-        costL+=L
-    costT+=log_s(n_segment)+log_s(n_cluster)+n_segment*log_s(n_cluster) # number of segments and cluster + assignment
-    costA+=log_s(n_segment)+log_s(n_cluster)+n_segment*log_s(n_cluster) # number of segments and cluster + assignment
-    return costT,costM,costC,costA,costL
-def segment_MDL_dam(x,gl_mode,index_list,Cov,sparsity):
-    ndim = x.ndim - 1
-    costM,costC,costL = 0, 0, 0
-    costA = data_length_cost(index_list)
-    for n in range(ndim):
-        x_unfold = sf_unfold(x, gl_mode, mode=n) # [sample, Dn, dn]
-        costM += model_description_cost(Cov[n][0])
-        c_temp,l_temp = data_coding_cost_dam(x_unfold,Cov[n][0],sparsity)
-        costC+=c_temp
-        costL+=l_temp
-    costM/=ndim
-    costT = costA+costM+costC+costL
-    return costT,costM,costC,costA,costL
-def data_coding_cost_dam(x,cov,sparsity):
-    return -likelihood(x,cov), sparsity*l1_norm(cov)
-
-def segments_MDL(Segments,X,gl_mode):
+def segments_MDL(Segments,X):
     # Segments[solo,solo,solo]
     # return costT of each segment
     costT=0
     n_cluster=len(Segments)
     n_segment=0
     for seg in Segments:
-        T,_,_,_=segment_MDL(X[seg.index],gl_mode,seg.index_list,seg.Cov,seg.sparsity)
+        T,_,_,_=segment_MDL(X[seg.index],seg.index_list,seg.Cov,seg.sparsity)
         n_segment+=len(seg.index_list)
         costT+=T
     costT+=log_s(n_segment)+log_s(n_cluster)+n_segment*log_s(n_cluster) # number of segments and cluster + assignment
 
     return costT
 
-def segment_MDL(x,gl_mode,index_list,Cov,sparsity):
+def segment_MDL(x,index_list,Cov,sparsity):
     '''
     input
     x: input tensor (concatenated segment)
@@ -270,7 +235,7 @@ def segment_MDL(x,gl_mode,index_list,Cov,sparsity):
     costM,costC = 0, 0
     costA = data_length_cost(index_list)
     for n in range(ndim):
-        x_unfold = sf_unfold(x, gl_mode, mode=n) # [sample, Dn, dn]
+        x_unfold = sf_unfold(x, mode=n) # [sample, Dn, dn]
         costM += model_description_cost(Cov[n][0])
         costC += data_coding_cost(x_unfold,Cov[n][0],sparsity)
     costM/=ndim
@@ -351,13 +316,13 @@ class DMM():
         self.time=0
         self.covariance_=None # covariance_=list(segment, ..., segment) n_seg, segment=list(tuple, tuple) n_dim, tuple=tuple(presicion, covariance)
 
-    def fit(self,X,cp,gl_mode):
+    def fit(self,X,cp):
         starttime=time.time()
         self.print_verbose('Segmentation Start')
-        new_cp,history_cp=self.segmentation(X,cp,gl_mode)
+        new_cp,history_cp=self.segmentation(X,cp)
         self.print_verbose('Segmentation End')
         self.print_verbose('Classification Start')
-        all_regime_objs,min_costT=self.viterbi_classification(X,new_cp,gl_mode)
+        all_regime_objs,min_costT=self.viterbi_classification(X,new_cp)
         self.print_verbose('Classification End')
         self.time=time.time()-starttime
         self.result=all_regime_objs
@@ -369,12 +334,11 @@ class DMM():
         util.save(self,X,history_cp,history)
 
 
-    def segmentation(self,X,cp,gl_mode):
+    def segmentation(self,X,cp):
         '''
         input
         X: input tensor [time, d1, d2, ..., dn]
         cp: initial cut point, for example [5, 10, 15, ... , ]
-        gl_mode: if 1 use each mean value [0, 1, ... , 0]
         '''
         sparsity=self.sparsity
         max_iter=self.max_iter
@@ -388,11 +352,11 @@ class DMM():
 
             if len(cp)+1>2: # if there are 2 or more segments
                 Single_CP=CutPoint(cp=cp,length=length)
-                Single_Segments=Segments_GL(X,Single_CP.cp,gl_mode,sparsity,max_iter)
+                Single_Segments=Segments_GL(X,Single_CP.cp,sparsity,max_iter)
                 Even_CP=Single_CP.even_cp()
-                Even_Segments=Segments_GL(X,Even_CP.cp,gl_mode,sparsity,max_iter)
+                Even_Segments=Segments_GL(X,Even_CP.cp,sparsity,max_iter)
                 Odd_CP=Single_CP.odd_cp()
-                Odd_Segments=Segments_GL(X,Odd_CP.cp,gl_mode,sparsity,max_iter)
+                Odd_Segments=Segments_GL(X,Odd_CP.cp,sparsity,max_iter)
                 self.covariance_=list([seg.Cov for seg in Single_Segments])
 
                 index=0
@@ -407,8 +371,8 @@ class DMM():
                             End_CP=Odd_CP
                             End_Segments=Odd_Segments
                             end_index=int(index/2)+1
-                        solo=segments_MDL([Single_Segments[index],Single_Segments[index+1]],X,gl_mode)
-                        end=segments_MDL([End_Segments[end_index]],X,gl_mode)
+                        solo=segments_MDL([Single_Segments[index],Single_Segments[index+1]],X)
+                        end=segments_MDL([End_Segments[end_index]],X)
 
                         if min(solo,end)==solo:
                             # print('solo')
@@ -435,9 +399,9 @@ class DMM():
                             left_index=int(index/2)+1
                             right_index=int(index/2)+1
 
-                        solo=segments_MDL([Single_Segments[index],Single_Segments[index+1],Single_Segments[index+2]],X,gl_mode)
-                        left=segments_MDL([Left_Segments[left_index],Single_Segments[index+2]],X,gl_mode)
-                        right=segments_MDL([Single_Segments[index],Right_Segments[right_index]],X,gl_mode)
+                        solo=segments_MDL([Single_Segments[index],Single_Segments[index+1],Single_Segments[index+2]],X)
+                        left=segments_MDL([Left_Segments[left_index],Single_Segments[index+2]],X)
+                        right=segments_MDL([Single_Segments[index],Right_Segments[right_index]],X)
 
                         if min(solo,left,right)==solo:
                             # print('solo')
@@ -463,13 +427,13 @@ class DMM():
 
             elif len(cp)+1==2: # if there left two segments (special case)
                 Single_CP=CutPoint(cp=cp,length=length)
-                Single_Segments=Segments_GL(X,cp,gl_mode,sparsity,max_iter)
+                Single_Segments=Segments_GL(X,cp,sparsity,max_iter)
                 self.covariance_=list([seg.Cov for seg in Single_Segments])
 
-                Whole_Segment=Segments_GL(X,[],gl_mode,sparsity,max_iter)
+                Whole_Segment=Segments_GL(X,[],sparsity,max_iter)
 
-                solo=segments_MDL([Single_Segments[0],Single_Segments[1]],X,gl_mode)
-                whole=segments_MDL([Whole_Segment[0]],X,gl_mode)
+                solo=segments_MDL([Single_Segments[0],Single_Segments[1]],X)
+                whole=segments_MDL([Whole_Segment[0]],X)
                 new_cp=np.empty(0,dtype=np.int32)
                 if min(solo,whole)==solo:
                     # print('solo')
@@ -484,7 +448,7 @@ class DMM():
 
         return new_cp, history_cp
 
-    def viterbi_classification(self,X,new_cp,gl_mode):
+    def viterbi_classification(self,X,new_cp):
         from sklearn.cluster import KMeans
 
         def updateClusters(LLE_node_vals, switch_penalty=0):
@@ -524,7 +488,7 @@ class DMM():
         num_seg=len(new_cp)+1
         ndim = X.ndim - 1
 
-        result_optRes=[Segment(X,gl_mode,index=np.arange(len(X)),id=0,Cov=self.covariance_[0],sparsity=self.sparsity,max_iter=self.max_iter)]
+        result_optRes=[Segment(X,index=np.arange(len(X)),id=0,Cov=self.covariance_[0],sparsity=self.sparsity,max_iter=self.max_iter)]
         min_costT=result_optRes[0].costT+3
         self.print_verbose(f"n_clusters ## 1\n")
         self.print_verbose(f"costT = {min_costT}")
@@ -569,13 +533,13 @@ class DMM():
                 optRes=[None for _ in range(num_of_clusters)]
                 lle_segment_clusters=np.zeros([num_seg,num_of_clusters])
                 for cluster in range(num_of_clusters):
-                    optRes[cluster]=Segment(sample_clusters[cluster],gl_mode,index=index_clusters[cluster],id=cluster,sparsity=self.sparsity,max_iter=self.max_iter)
+                    optRes[cluster]=Segment(sample_clusters[cluster],index=index_clusters[cluster],id=cluster,sparsity=self.sparsity,max_iter=self.max_iter)
                     for seg_id,seg_cluster in enumerate(clustered_points):
                         x=util.get_seq_at_index(X,new_cp,seg_id)
 
                         lle_segment_clusters[seg_id,cluster]=0
                         for n in range(ndim):
-                            x_unfold = sf_unfold(x, gl_mode, mode=n) # [sample, dn]
+                            x_unfold = sf_unfold(x, mode=n) # [sample, dn]
                             lle_segment_clusters[seg_id,cluster]+=data_coding_cost(x_unfold,optRes[cluster].Cov[n][0],optRes[cluster].sparsity)
 
                 new_clustered_points=updateClusters(lle_segment_clusters,switch_penalty=0)
@@ -610,7 +574,7 @@ class DMM():
 
 
 class Param():
-    def __init__(self,data_path,label_path,save_result=True,data_name='test',z_norm=True,window_z_norm=False,window=5,_sparsity=0.1,max_iter=100,_CF=32,_threshold=0.05,_alpha=1,evaluate=False,gl_mode=None):
+    def __init__(self,data_path,label_path,save_result=True,data_name='test',z_norm=True,window_z_norm=False,window=5,_sparsity=0.1,max_iter=100,_CF=32,_threshold=0.05,_alpha=1,evaluate=False):
         self.data_path=data_path
         self.label_path=label_path
         self.data_name=data_name
@@ -630,7 +594,6 @@ class Param():
         self._threshold=_threshold
         self._alpha=_alpha
         self.evaluate=evaluate
-        self.gl_mode=gl_mode
         global CF
         CF=_CF
         global threshold
@@ -651,13 +614,9 @@ def main(data_path,data_name,sparsity,window,label_path='',cf=32,z_norm=False,wi
     X = np.squeeze(X)
     print('input X',X.shape)
 
-    ndim = X.ndim-1
-    gl_mode = []
-    for n in range(ndim):
-        gl_mode.append(1)
 
     ngl=DMM(sparsity=args.sparsity,max_iter=args.max_iter,save_result=args.save_result,save_dir=args.save_dir)
-    ngl.fit(X,cp,gl_mode)
+    ngl.fit(X,cp)
 
     if args.evaluate:
         transition=np.loadtxt(f'{args.save_dir}/transition.txt')
@@ -667,43 +626,3 @@ def main(data_path,data_name,sparsity,window,label_path='',cf=32,z_norm=False,wi
         print('accuracy',accuracy)
         np.savetxt(f'{args.save_dir}/f1.txt',[macro_f1],fmt='%.5e')
         np.savetxt(f'{args.save_dir}/accuracy.txt',[accuracy],fmt='%.5e')
-
-def test(z_norm=False,window_z_norm=False,evaluate=True):
-    data_path=''
-    label_path=''
-    data_name='test'
-    sparsity=0.5
-    cf=32
-    window=4
-    alpha=1
-
-    args=Param(data_path,label_path,save_result=True,data_name=data_name,z_norm=z_norm,window_z_norm=window_z_norm,window=window,_sparsity=sparsity,max_iter=100,_CF=cf,_threshold=0.05,_alpha=alpha,evaluate=evaluate)
-    with open(f'{args.save_dir}/args.txt','w') as f:
-        for arg in vars(args):
-            f.write(f'{arg}:{vars(args)[arg]}\n')
-
-    X,cp=util.data_import(args)
-    print('input X',X.shape)
-
-    ndim = X.ndim-1
-    gl_mode = []
-    for n in range(ndim):
-        gl_mode.append(1)
-
-    ngl=DMM(sparsity=args.sparsity,max_iter=args.max_iter,save_result=args.save_result,save_dir=args.save_dir)
-    ngl.fit(X,cp,gl_mode)
-
-    util.save_gorgeous(args)
-
-    if args.evaluate:
-        transition=np.loadtxt(f'{args.save_dir}/transition.txt')
-        y_true=np.loadtxt(args.label_path)
-        accuracy, macro_f1, confusion_matrix=evaluation.evaluate_clustering_accuracy(y_true[:len(transition)],transition)
-        print('macro_f1',macro_f1)
-        print('accuracy',accuracy)
-        np.savetxt(f'{args.save_dir}/f1.txt',[macro_f1],fmt='%.5e')
-        np.savetxt(f'{args.save_dir}/accuracy.txt',[accuracy],fmt='%.5e')
-
-if __name__=='__main__':
-    print('DMM')
-    test()
