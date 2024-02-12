@@ -1,4 +1,8 @@
 # DMM: Dynamic Multi-Network Mining of Tensor Time Series
+Implementation of [DMM](),
+Kohei Obata, Koki Kawabata, Yasuko Matsubara, Yasushi Sakurai.
+The Web Conference 2024, [WWW'24](https://www2024.thewebconf.org/).
+
 
 
 ## Requirements
@@ -42,3 +46,14 @@ python experiment_synthetic.py
 ```
 python experiment_realdata.py
 ```
+
+
+## Citation
+If you use this code for your research, please consider citing our WWW paper.
+```bibtex
+to appear
+```
+
+<!-- ## More on -->
+<!-- * Paper: [[ACM DL]](https://dl.acm.org/doi/10.1145/3543507.3583370) [[arXiv]](https://arxiv.org/abs/2303.03789) -->
+<!-- * Short Video: [[YouTube]](https://youtu.be/v-E-QjEBwNk) -->
