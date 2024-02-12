@@ -168,7 +168,10 @@ def import_data(name):
 
 
 
-names=['commerce' ,'vod' ,'sweets','covid_flu' ,'gafam' ,'air']
+# unzip DMM/data/google.zip
+names=['commerce' ,'vod' ,'sweets','covid_flu' ,'gafam']
+# after downloading Air-quality dataset
+# names=['air']
 
 for name in names:
     data,cp,DATADIR = import_data(name)
@@ -178,10 +181,9 @@ for name in names:
     data_name=name
     z_norm=False
     window_z_norm=True
-    gl_mode=list(np.ones(data.ndim - 1))
     for sparsity in [0.5]:
         alpha=1
-        args=Param(data_path,label_path,save_result=True,data_name=data_name,z_norm=z_norm,window_z_norm=window_z_norm,_sparsity=sparsity,_alpha=alpha,evaluate=False,gl_mode=gl_mode)
+        args=Param(data_path,label_path,save_result=True,data_name=data_name,z_norm=z_norm,window_z_norm=window_z_norm,_sparsity=sparsity,_alpha=alpha,evaluate=False)
         with open(f'{args.save_dir}/args.txt','w') as f:
             for arg in vars(args):
                 f.write(f'{arg}:{vars(args)[arg]}\n')
@@ -189,4 +191,4 @@ for name in names:
         print('input data',data.shape)
 
         ddnf=DMM(sparsity=args.sparsity,max_iter=args.max_iter,save_result=args.save_result,save_dir=args.save_dir)
-        ddnf.fit(data,cp,gl_mode)
+        ddnf.fit(data,cp)
