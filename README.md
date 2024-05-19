@@ -51,7 +51,22 @@ python experiment_realdata.py
 ## Citation
 If you use this code for your research, please consider citing our WWW paper.
 ```bibtex
-to appear
+@inproceedings{10.1145/3589334.3645461,
+author = {Obata, Kohei and Kawabata, Koki and Matsubara, Yasuko and Sakurai, Yasushi},
+title = {Dynamic Multi-Network Mining of Tensor Time Series},
+year = {2024},
+isbn = {9798400701719},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3589334.3645461},
+doi = {10.1145/3589334.3645461},
+booktitle = {Proceedings of the ACM on Web Conference 2024},
+pages = {4117–4127},
+numpages = {11},
+keywords = {clustering, graphical lasso, network inference, tensor time series},
+location = {, Singapore, Singapore, },
+series = {WWW '24}
+}
 ```
 
 <!-- ## More on -->
