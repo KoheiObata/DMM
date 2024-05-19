@@ -1,5 +1,5 @@
 # DMM: Dynamic Multi-Network Mining of Tensor Time Series
-Implementation of [DMM](),
+Implementation of [DMM](https://dl.acm.org/doi/10.1145/3589334.3645461),
 Kohei Obata, Koki Kawabata, Yasuko Matsubara, Yasushi Sakurai.
 The Web Conference 2024, [WWW'24](https://www2024.thewebconf.org/).
 
@@ -9,14 +9,12 @@ The Web Conference 2024, [WWW'24](https://www2024.thewebconf.org/).
 1. Install Python 3.8, and the required dependencies.
 2. Required dependencies can be installed by: ```pip install -r requirements.txt```
 
-(
 ```
 pip install numpy
 pip install pandas
 pip install matplotlib
 pip install sklearn
 ```
-)
 
 
 ## Data Preparation
